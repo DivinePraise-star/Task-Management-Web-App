@@ -7,10 +7,10 @@
     <form action="/update/{{task.id}}" method="POST">
         <div style="display: flex; flex-direction: column; gap: 1rem;">
             <input type="text" name="content" value="{{task.content}}" required>
-            <input type="email" name="email" value="{{task.email}}" placeholder="Email for reminders (optional)">
+            <input type="email" name="email" value="{{task.email}}" placeholder="Your email address (optional)">
             <div style="display: flex; gap: 1rem;">
                 <button type="submit" class="btn btn-primary">Update Task</button>
-                <a href="/" class="btn btn-danger">Cancel</a>
+                <a href="/" class="btn btn-secondary">Cancel</a>
             </div>
         </div>
     </form>
