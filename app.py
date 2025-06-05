@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///db.sqlite'
-app.config['SECRET_KEY'] = 'your-secret-key-here'  # Required for flash messages
+app.config['SECRET_KEY'] = 'your-secret-key-here'
 
 # Email configuration
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
@@ -47,14 +47,14 @@ def send_reminder_email(task_id):
             except Exception as e:
                 print(f"Failed to send email: {str(e)}")
 
-def schedule_reminders(task_id):
-    scheduler.add_job(
-        func=send_reminder_email,
-        trigger='interval',
-        hours=6,
-        args=[task_id],
-        id=f'task_{task_id}'
-    )
+@scheduler.scheduled_job('interval', hours=6)
+def check_and_send_reminders():
+    with app.app_context():
+        tasks = Todo.query.filter_by(complete=False).all()
+        for task in tasks:
+            if task.email:
+                if not task.last_reminder or datetime.utcnow() - task.last_reminder > timedelta(hours=6):
+                    send_reminder_email(task.id)
 
 @app.route('/', methods=['POST', 'GET'])
 def index():
@@ -66,7 +66,6 @@ def index():
         try:
             db.session.add(new_task)
             db.session.commit()
-            schedule_reminders(new_task.id)
             flash('Task added successfully!')
             return redirect('/')
         except Exception as e:
@@ -79,12 +78,6 @@ def index():
 def delete(id):
     task_to_delete = Todo.query.get_or_404(id)
     try:
-        # Remove the scheduled job if it exists
-        try:
-            scheduler.remove_job(f'task_{id}')
-        except:
-            pass
-        
         db.session.delete(task_to_delete)
         db.session.commit()
         return redirect('/')
@@ -100,13 +93,6 @@ def update(id):
         
         try:
             db.session.commit()
-            # Reschedule reminder if email changed
-            try:
-                scheduler.remove_job(f'task_{id}')
-            except:
-                pass
-            if task.email:
-                schedule_reminders(task.id)
             return redirect('/')
         except:
             return 'There was an issue updating your task'
@@ -119,18 +105,6 @@ def complete(id):
     try:
         task.complete = not task.complete
         db.session.commit()
-        
-        # Remove reminder if task is completed
-        if task.complete:
-            try:
-                scheduler.remove_job(f'task_{id}')
-            except:
-                pass
-        else:
-            # Reschedule if task is marked as incomplete
-            if task.email:
-                schedule_reminders(task.id)
-                
         return redirect('/')
     except:
         return 'There was an issue updating the task status'
